@@ -1,17 +1,19 @@
 package ToDoApp_JavaFiles;
 
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
+import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 
-public class Main {
+public class App {
 
     public static void main(String[] args) throws IOException {
+
+        System.out.println(Arrays.toString(args));
 
         if (args.length == 0) {
             System.out.println("Command Line Todo application\n" +
@@ -41,6 +43,28 @@ public class Main {
                 System.err.println("Couldn't read file!");
             }
             return;
+        }
+
+        if (args[0].contentEquals("-a")) {
+            if (args.length == 1) {
+                System.out.println("Unable to add: no task provided");
+            } else {
+                String filePath = "src/ToDoList/TaskList.txt";
+                String lineToAppend = args[1];
+
+                try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(filePath), StandardOpenOption.APPEND)) {
+                    writer.write(lineToAppend);
+                    writer.newLine();
+                } catch (IOException e) {
+                    System.err.println("Unable to add the task.");;
+                }
+            }
+        }
+
+        if (args[0].contentEquals("-c")) {
+            if (args.length == 1) {
+                System.out.println("Unable to check: no index provided");
+            }
         }
 
 
