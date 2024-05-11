@@ -4,51 +4,98 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 
 public class App {
 
     static String filePath = "src/ToDoList/TaskList.txt";
     public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        String[] allCommands = {"-l", "-a", "-c", "-r"};         // Available commands
+        printUsage();                                            // Display usage instructions
 
+        while (true) {                                           // Continue prompting the user for commands until they decide to exit
 
+            System.out.println("\nEnter a command: ");           // Prompt the user to enter a command
+            String input = scanner.nextLine().trim();
+
+            if (input.equals("exit")) {                          // Check if the user wants to exit
+                break;
+            }
+
+            String command = "";
+            String argument = "";
+
+            int firstQuoteIndex = input.indexOf('"');
+            int lastQuoteIndex = input.lastIndexOf('"');
+
+            if (firstQuoteIndex != -1 && lastQuoteIndex != -1 && firstQuoteIndex != lastQuoteIndex) {
+                command = input.substring(0, firstQuoteIndex).trim();
+                argument = input.substring(firstQuoteIndex + 1, lastQuoteIndex).trim();    // Extract the command and argument(s) from the input
+            } else {
+                int firstSpaceIndex = input.indexOf(" ");                                  // Handle the case where no arguments are provided (or no quotes are used)
+                if (firstSpaceIndex != -1) {
+                    command = input.substring(0, firstSpaceIndex).trim();
+                    argument = input.substring(firstSpaceIndex + 1).trim();
+                } else {
+                    command = input;       // No spaces found, the entire input is treated as a command
+                }
+            }
+
+            if (!Arrays.asList(allCommands).contains(command)) {
+                System.err.println("Unsupported argument");
+                printUsage();
+                continue;
+            }
+
+            String[] commandArgs = {command, argument};
+            try {
+                handleCommand(commandArgs);
+            } catch (IOException e) {
+                System.err.println("Error reading/writing file");
+            }
+        }
+        scanner.close();
+    }
+
+    private static void handleCommand(String[] args) throws IOException {
         if (args.length == 0) {
             printUsage();
             return;
         }
-
-        String[] commands = {"-l", "-a", "-c", "-r"};
-
-        if (!Arrays.asList(commands).contains(args[0])) {
-            System.err.println("Unsupported argument");
-            printUsage();
+        if ((args[0].equals("-r") || args[0].equals("-c")) && args[1].isEmpty()) {    // Checking for each command if the necessary argument is provided
+            if (args[0].equals("-r")) {
+                System.out.println("Unable to remove: no index provided");
+            } else if (args[0].equals("-c")) {
+                System.out.println("Unable to mark as completed: no index provided");
+            }
             return;
         }
 
-        try {
-            handleCommand(args);
-        } catch (IOException e) {
-            System.err.println("Error reading/writing file");
-        }
-    }
-
-    private static void handleCommand(String[] args) throws IOException {
-        if (args[0].equals("-l")) {
-            listTasks();
-        } else if (args[0].equals("-a")) {
-            if (args.length < 2){
-                System.out.println("Unable to add: no task provided");
-                return;} else {addTask(args[1]);}
-        } else if (args[0].equals("-c")) {
-            if (args.length < 2){
-                System.out.println("Unable to check: no task provided");
-                return;} else {completeTask(args);}
-        } else if (args[0].equals("-r")) {
-            if (args.length < 2){
-                System.out.println("Unable to remove: no task provided");
-                return;} else {removeTask(args);}
+        switch (args[0]) {
+            case "-l":
+                listTasks();
+                break;
+            case "-a":
+                if (args[1].isEmpty()) {
+                    System.err.println("Unable to add: no task provided");
+                } else {
+                    addTask(args[1]);
+                }
+                break;
+            case "-c":
+                completeTask(args);
+                break;
+            case "-r":
+                removeTask(args);
+                break;
+            default:
+                printUsage();
+                break;
         }
     }
 
@@ -82,14 +129,18 @@ public class App {
                 tasks.set(index, "[X] " + taskToCheck);
                 writeAllTasksToFile(tasks);
             } else {
-                System.out.println("Task " + taskNumber + " is already marked as completed.");
+                System.err.println("Task " + taskNumber + " is already marked as completed.");
             }
         } else {
-            System.out.println("Unable to check: index is out of bound");
+            System.err.println("Unable to check: index is out of bound");
         }
     }
 
     private static void removeTask(String[] args) throws IOException {
+        if (args.length < 2) {
+            System.err.println("Unable to remove: no index provided");
+            return;
+        }
 
         int taskNumber = Integer.parseInt(args[1]);
         List<String> tasks = readTasksFromFile();
@@ -98,20 +149,22 @@ public class App {
             tasks.remove(taskNumber - 1);
             writeAllTasksToFile(tasks);
         } else {
-            System.out.println("Unable to remove: index is out of bound");
+            System.err.println("Unable to remove: index is out of bound");
         }
     }
 
     private static List<String> readTasksFromFile() throws IOException {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            return reader.lines().collect(Collectors.toList());
+            return new ArrayList<>(reader.lines().collect(Collectors.toList()));
         }
     }
 
     private static void writeTaskToFile(String task, boolean append) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(filePath),
                 append ? StandardOpenOption.APPEND : StandardOpenOption.WRITE)) {
-            writer.newLine();
+            if (append && new File(filePath).length() > 0) {    // Check if file is not empty
+                writer.newLine();                               // Add a newline before appending the task
+            }
             writer.write(task);
         }
     }
@@ -126,15 +179,14 @@ public class App {
     }
 
     private static void printUsage() {
-        System.out.println("Command Line Todo application\n" +
-                "=============================\n" +
-                "\n" +
-                "Command line arguments:\n" +
-                "    -l   Lists all the tasks\n" +
-                "    -a   Adds a new task\n" +
-                "    -r   Removes a task\n" +
-                "    -c   Completes a task");
+        System.out.println("""
+                Command Line Todo application
+                =============================
+                
+                Command line arguments:
+                -l   Lists all the tasks
+                -a   Adds a new task
+                -r   Removes a task
+                -c   Completes a task""");
     }
 }
-
-
